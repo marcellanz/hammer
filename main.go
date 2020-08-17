@@ -39,13 +39,14 @@ func main() {
 		lookup := build.Value().Lookup("msg001")
 		fmt.Printf("exists: %+v\n", lookup.Exists())
 		fmt.Printf("incomplete: %+v\n", build.Incomplete)
-		m := &msg{}
 		v := build.Value()
 		fi, err := v.FieldByName("msg001", false)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("len: %+v\n", fi)
+		fmt.Printf("field: %+v\n", fi)
+
+		m := &msg{}
 		err = fi.Value.Decode(m)
 		if err != nil {
 			panic(err)
