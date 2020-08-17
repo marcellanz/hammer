@@ -3,6 +3,7 @@ package test
 import "github.com/marcellanz/hammer/schemas/cloudstate:protocol"
 
 discover: #service & {
+    name: "cloudstate.EntityDiscovery"
 	method: "cloudstate.EntityDiscovery/Discover"
 	proto:  "cloudstate/entity.proto"
 }
@@ -14,23 +15,21 @@ all: [...#flow & {service: discover}] & [
 
 flow0: {
 	name: "discover - ok"
-	seq: [
-		// the first message is a valid discovery call with a response expected
-		{
-			req: msg: #proxyInfo & {
-				supportedEntityTypes: ["cloudstate.eventsourced.EventSourced"]
-			}
-			resp: msg: #entitySpec
-		},
-	]
+	// the first message is a valid discovery call with a response expected
+	seq: [{
+		req: msg: {
+			supportedEntityTypes: ["cloudstate.eventsourced.EventSourced"]
+		}
+		resp: msg: #entitySpec
+	}]
 }
 
 flow1: {
 	name: "discover - not ok"
 	// here we give the proxy a different name and set a lower timeout
 	seq: [
-		#seq & {
-			req: msg: #proxyInfo & {
+		{
+			req: msg: {
 				proxyName: "TCK2"
 				supportedEntityTypes: ["cloudstate.eventsourced.EventSourced"]
 			}
@@ -44,8 +43,8 @@ flow1: {
 			resp: meta: maxTimeout: 2 * resp.meta.timeout
 		},
 		// this call should fail
-		#seq & {
-			req: msg: #proxyInfo & {
+		{
+			req: msg: {
 				proxyName: "TCK3"
 				supportedEntityTypes: ["cloudstate.nonexisting.Model"]
 			}
