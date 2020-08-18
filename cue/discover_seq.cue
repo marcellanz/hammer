@@ -3,7 +3,7 @@ package test
 import "github.com/marcellanz/hammer/schemas/cloudstate:protocol"
 
 discover: #service & {
-    name: "cloudstate.EntityDiscovery"
+	name:   "cloudstate.EntityDiscovery"
 	method: "cloudstate.EntityDiscovery/Discover"
 	proto:  "cloudstate/entity.proto"
 }
@@ -13,12 +13,12 @@ all: [...#flow & {service: discover}] & [
 	flow1,
 ]
 
+// the first flow is a valid discovery call with a response expected
 flow0: {
 	name: "discover - ok"
-	// the first message is a valid discovery call with a response expected
 	seq: [{
-		req: msg: {
-			supportedEntityTypes: ["cloudstate.eventsourced.EventSourced"]
+		req: msg: #proxyInfo & {
+		    supportedEntityTypes: ["cloudstate.eventsourced.EventSourced"]
 		}
 		resp: msg: #entitySpec
 	}]
@@ -27,24 +27,23 @@ flow0: {
 flow1: {
 	name: "discover - not ok"
 	// here we give the proxy a different name and set a lower timeout
-	seq: [
-		{
-			req: msg: {
-				proxyName: "TCK2"
-				supportedEntityTypes: ["cloudstate.eventsourced.EventSourced"]
+	seq: [{
+		req: msg: #proxyInfo & {
+			proxyName: "TCK2"
+			supportedEntityTypes: ["cloudstate.eventsourced.EventSourced"]
+		}
+		resp: {
+			msg: #entitySpec
+			meta: headers: {
+				"h3": "v3", "h4": "v4"
 			}
-			resp: {
-				msg: #entitySpec
-				meta: headers: {
-					"h3": "v3", "h4": "v4"
-				}
-			}
-			resp: meta: timeout:    15
-			resp: meta: maxTimeout: 2 * resp.meta.timeout
-		},
+		}
+		resp: meta: timeout:    15
+		resp: meta: maxTimeout: 2 * resp.meta.timeout
+	},
 		// this call should fail
 		{
-			req: msg: {
+			req: msg: #proxyInfo & {
 				proxyName: "TCK3"
 				supportedEntityTypes: ["cloudstate.nonexisting.Model"]
 			}
