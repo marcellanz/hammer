@@ -4,8 +4,12 @@ import "github.com/marcellanz/hammer/schemas/cloudstate:protocol"
 
 discover: #service & {
 	name:   "cloudstate.EntityDiscovery"
-	method: "cloudstate.EntityDiscovery/Discover"
+	method: "cloudstate.EntityDiscovery/discover"
 	proto:  "cloudstate/entity.proto"
+}
+
+#conn: {
+	target: string
 }
 
 all: [...#flow & {service: discover}] & [
@@ -18,15 +22,15 @@ flow0: {
 	name: "discover - ok"
 	seq: [{
 		req: msg: #proxyInfo & {
-		    supportedEntityTypes: ["cloudstate.eventsourced.EventSourced"]
+			supportedEntityTypes: ["cloudstate.eventsourced.EventSourced"]
 		}
 		resp: msg: #entitySpec
 	}]
 }
 
+// here we give the proxy a different name and set a lower timeout
 flow1: {
 	name: "discover - not ok"
-	// here we give the proxy a different name and set a lower timeout
 	seq: [{
 		req: msg: #proxyInfo & {
 			proxyName: "TCK2"
@@ -35,29 +39,29 @@ flow1: {
 		resp: {
 			msg: #entitySpec
 			meta: headers: {
-				"h3": "v3", "h4": "v4"
+				"h3": "v3", "h4": "v4", "h5": req.msg.proxyName
 			}
 		}
 		resp: meta: timeout:    15
 		resp: meta: maxTimeout: 2 * resp.meta.timeout
 	},
-		// this call should fail
-		{
-			req: msg: #proxyInfo & {
-				proxyName: "TCK3"
-				supportedEntityTypes: ["cloudstate.nonexisting.Model"]
-			}
-			resp: msg:                  #grpcError
-			resp: meta: headers: {"h1": "v1", "h2": "v2"}
-			stream: gRCPErrorCode: "CANCELLED"
-			stream: closed:        true
-		},
+    // this call should fail
+    {
+        req: msg: #proxyInfo & {
+            proxyName: "TCK3"
+            supportedEntityTypes: ["cloudstate.nonexisting.Model"]
+        }
+        resp: msg:                  #grpcError
+        resp: meta: headers: {"h1": "v1", "h2": "v2"}
+        stream: gRCPErrorCode: "CANCELLED"
+        stream: closed:        true
+    },
 	]
 }
 
 #proxyInfo: protocol.#ProxyInfo & {
-	protocolMajorVersion: 1
-	protocolMinorVersion: 0
+	protocolMajorVersion: int | *0
+	protocolMinorVersion: int | *0
 	proxyName:            string | *"TCK"
 	proxyVersion:         string | *"1.1.0"
 }
@@ -95,8 +99,8 @@ flow1: {
 
 #seq: {
 	req: {
-		meta?:   #meta
 		msg:     protocol.#ProxyInfo
+		meta?:   #meta
 		stream?: #stream
 	}
 	resp?: {
