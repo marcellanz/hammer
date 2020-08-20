@@ -3,12 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"time"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/load"
+	"cuelang.org/go/encoding/gocode"
 	"github.com/jhump/protoreflect/desc/protoparse"
+	protocol "github.com/mrcllnz/hammer/proto/protocol/cloudstate"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -16,8 +20,9 @@ import (
 )
 
 func main() {
-	//protos()
 	runCue()
+	//protos()
+	//genCue()
 }
 
 func protos() {
@@ -62,9 +67,33 @@ func protos() {
 	}
 }
 
+func genCue() {
+	instances := load.Instances([]string{
+		"./discover_seq.cue",
+	},
+		&load.Config{
+			Dir: "./cue",
+		},
+	)
+	var r cue.Runtime
+	for _, i := range instances {
+		instance, err := r.Build(i)
+		if err != nil {
+			panic(err)
+		}
+		b, err := gocode.Generate("main", instance, nil)
+		if err != nil {
+			// handle error
+		}
+
+		err = ioutil.WriteFile("cue_gen.go", b, 0644)
+	}
+}
+
 func runCue() {
 	var r cue.Runtime
 	instances := load.Instances([]string{
+		"./types.cue",
 		"./discover_seq.cue",
 	},
 		&load.Config{
@@ -74,31 +103,31 @@ func runCue() {
 	for _, i := range instances {
 		fmt.Printf("pkg: %+v\n", i.PkgName)
 
-		build, err := r.Build(i)
+		instance, err := r.Build(i)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("incomplete: %+v\n", build.Incomplete)
-		lookup := build.Value().Lookup("all")
+		fmt.Printf("incomplete: %+v\n", instance.Incomplete)
+		lookup := instance.Value().Lookup("all")
 		fmt.Printf("exists: %+v\n", lookup.Exists())
 		if !lookup.Exists() {
 			continue
 		}
-		l := lookup.Eval()
-		fmt.Printf("all.kind: %+v\n", l.Kind())
-		fmt.Printf("all.len: %+v\n", l.Len())
+		all := lookup.Eval()
+		fmt.Printf("all.kind: %+v\n", all.Kind())
+		fmt.Printf("all.len: %+v\n", all.Len())
 
-		list, err := l.List()
+		flows, err := all.List()
 		if err != nil {
 			panic(err)
 		}
-		for list.Next() {
-			value := list.Value()
-			fmt.Printf("list.Value: %+v\n", value)
-			eval := value.Eval()
-			fmt.Printf("list.Value: %+v\n", eval)
-			s, _ := value.Struct()
-			fmt.Printf("list.Value: %+v\n", s)
+		for flows.Next() {
+			flow := flows.Value()
+			eval := flow.Eval()
+			fmt.Printf("flows.flow: %+v\n", flow)
+			fmt.Printf("flows.flow.value: %+v\n", eval)
+			s, _ := flow.Struct()
+			fmt.Printf("flows.flow.struct: %+v\n", s)
 			f, err := s.FieldByName("seq", false)
 			if err != nil {
 				panic(err)
@@ -111,35 +140,31 @@ func runCue() {
 				panic(err)
 			}
 			for sl.Next() {
-				se := sl.Value()
-				req, err := se.FieldByName("req", false)
+				s := sl.Value()
+				reqF, err := s.FieldByName("req", false)
 				if err != nil {
 					panic(err)
 				}
-				fmt.Printf("req: %+v\n", req.Value.Eval())
+				req := reqF.Value.Eval()
+				fmt.Printf("req: %+v\n", req)
+
+				msg, err := req.FieldByName("msg", false)
+				if err != nil {
+					panic(err)
+				}
+
+				info := protocol.ProxyInfo{}
+				json, err := msg.Value.MarshalJSON()
+				if err != nil {
+					panic(err)
+				}
+				err = protojson.Unmarshal(json, &info)
+				if err != nil {
+					panic(err)
+				}
+				fmt.Printf("msg: %+v\n", msg.Value.Eval())
+				fmt.Printf("info: %+v\n", info)
 			}
 		}
-
-		//if l.Kind() != cue.ListKind {
-		//	panic("all is not a list")
-		//}
-
-		//_, err := v.List()
-		//if err != nil {
-		//	panic(err)
-		//}
-		//list.Next()
-		//fi, err := v.FieldByName("msg001", false)
-		//if err != nil {
-		//	panic(err)
-		//}
-		//fmt.Printf("field: %+v\n", fi)
-		//
-		//m := &msg{}
-		//err = fi.Value.Decode(m)
-		//if err != nil {
-		//	panic(err)
-		//}
-		//fmt.Printf("msg: %+v\n", m)
 	}
 }

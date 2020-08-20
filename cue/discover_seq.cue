@@ -1,18 +1,18 @@
-package test
+package hammer
 
 import "github.com/marcellanz/hammer/schemas/cloudstate:protocol"
 
-discover: #service & {
+discover: #Service & {
 	name:   "cloudstate.EntityDiscovery"
 	method: "cloudstate.EntityDiscovery/discover"
 	proto:  "cloudstate/entity.proto"
 }
 
-#conn: {
-	target: string
+c: #Conn & {
+	target: "localhost:8080"
 }
 
-all: [...#flow & {service: discover}] & [
+all: [...#Flow & {service: discover, conn: c}] & [
 	flow0,
 	flow1,
 ]
@@ -44,19 +44,17 @@ flow1: {
 		}
 		resp: meta: timeout:    15
 		resp: meta: maxTimeout: 2 * resp.meta.timeout
-	},
-    // this call should fail
-    {
-        req: msg: #proxyInfo & {
-            proxyName: "TCK3"
-            supportedEntityTypes: ["cloudstate.nonexisting.Model"]
-        }
-        resp: msg:                  #grpcError
-        resp: meta: headers: {"h1": "v1", "h2": "v2"}
-        stream: gRCPErrorCode: "CANCELLED"
-        stream: closed:        true
-    },
-	]
+	}, {
+		// this call should fail
+		req: msg: #proxyInfo & {
+			proxyName: "TCK3"
+			supportedEntityTypes: ["cloudstate.nonexisting.Model"]
+		}
+		resp: msg:                  #GRPCError
+		resp: meta: headers: {"h1": "v1", "h2": "v2"}
+		stream: gRCPErrorCode: "CANCELLED"
+		stream: closed:        true
+	}]
 }
 
 #proxyInfo: protocol.#ProxyInfo & {
@@ -85,45 +83,7 @@ flow1: {
 	}
 }
 
-#flow: {
-	name:    string
-	service: #service
-	seq: [...#seq]
-}
 
-#service: {
-	name:   string
-	method: string
-	proto:  string
-}
-
-#seq: {
-	req: {
-		msg:     protocol.#ProxyInfo
-		meta?:   #meta
-		stream?: #stream
-	}
-	resp?: {
-		msg?:    protocol.#EntitySpec | #grpcError
-		meta?:   #meta
-		stream?: #stream
-	}
-	stream?: #stream
-}
-
-#stream: {
-	closed:         bool | *false
-	gRCPErrorCode?: string | uint
-}
-
-#grpcError: {
-}
-
-#meta: {
-	timeout: *60 | uint
-	headers?: [string]: string
-	...
-}
 
 // Entity discovery service.
 //service EntityDiscovery {
